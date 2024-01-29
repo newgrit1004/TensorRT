@@ -454,6 +454,45 @@ class StableDiffusionPipeline:
         for model_name, obj in self.models.items():
             if torch_fallback[model_name]:
                 self.torch_models[model_name] = obj.get_model(torch_inference=self.torch_inference)
+                if model_name == "unet" and obj.lora_dict:
+                    self.torch_models[model_name] = merge_loras(self.torch_models[model_name], obj.lora_dict, obj.lora_alphas, obj.lora_scales)
+
+    def refit_engine(self, lora_suffix):
+        model_name = "unet"
+        framework_model_dir = "./pytorch_model"
+        engine_dir = "./engine"
+        onnx_opt_path = "./onnx/unet.opt/model.onnx"
+        weights_map_path = "./onnx/unet.opt/weights_map.json"
+
+        models_args = {'version': self.version, 'pipeline': self.pipeline_type, 'device': self.device,
+            'hf_token': self.hf_token, 'verbose': self.verbose, 'framework_model_dir': framework_model_dir,
+            'max_batch_size': self.max_batch_size}
+
+        if self.lora_loader:
+            lora_dict, lora_alphas = self.lora_loader.get_dicts('unet')
+            assert len(lora_dict) == len(self.lora_scales)
+
+        self.models['unet'] = UNetModel(**models_args, fp16=True,
+                                        controlnets=self.controlnets,
+                                        lora_scales=self.lora_scales, lora_dict=lora_dict,
+                                        lora_alphas=lora_alphas, do_classifier_free_guidance=self.do_classifier_free_guidance)
+        obj = self.models['unet']
+
+        if obj.lora_dict:
+            with open(weights_map_path, 'r') as fp_wts:
+                print(f"[I] Loading weights map: {weights_map_path} ")
+                [weights_name_mapping, weights_shape_mapping] = json.load(fp_wts)
+                refit_weights_path = self.getRefitNodesPath(model_name, engine_dir, suffix=lora_suffix)
+                if not os.path.exists(refit_weights_path):
+                    print(f"[I] Saving refit weights: {refit_weights_path}")
+                    model = merge_loras(obj.get_model(), obj.lora_dict, obj.lora_alphas, obj.lora_scales)
+                    refit_weights = get_refit_weights(model.state_dict(), onnx_opt_path, weights_name_mapping, weights_shape_mapping)
+                    torch.save(refit_weights, refit_weights_path)
+                    unload_model(model)
+                else:
+                    print(f"[I] Loading refit weights: {refit_weights_path}")
+                    refit_weights = torch.load(refit_weights_path)
+                self.engine[model_name].refit(refit_weights, obj.fp16)
 
     def calculateMaxDeviceMemory(self):
         max_device_memory = 0
