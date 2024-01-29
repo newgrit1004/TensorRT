@@ -24,12 +24,6 @@ async def test(request:Request, body:dict) -> int:
 
     lora_suffix = '-'+'-'.join([str(md5(path.encode('utf-8')).hexdigest())+'-'+('%.2f' % request.app.pipe.lora_scales[path]) for path in sorted(request.app.pipe.lora_loader.paths)]) if request.app.pipe.lora_loader else ''
 
-    # request.app.pipe.loadEngines("./engine", "./pytorch_model", "./onnx", **kwargs_load_engine)
-    # _, shared_device_memory = cudart.cudaMalloc(request.app.pipe.calculateMaxDeviceMemory())
-    # request.app.pipe.activateEngines(shared_device_memory)
-    # height, width, batch_size, seed = 512, 512, 1, 12
-    # request.app.pipe.loadResources(height, width, batch_size, seed)
-
     print("ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ")
     print(f"lora_suffix : {lora_suffix}")
     print("ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ")
