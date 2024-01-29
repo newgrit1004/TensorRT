@@ -1,0 +1,21 @@
+# change device ids depending on your gpu environment
+version: "3.8"
+
+services:
+  preprocessing:
+    image: lora_debug
+    container_name: lora_test_container
+    volumes:
+      - $PWD:/workspace
+    tty: true
+    stdin_open: true
+    ports:
+    - 8000:8000
+    deploy:
+      replicas: 1
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['5']
+            capabilities: [gpu]
